@@ -5,15 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-title" content="Cartoons">
+  <meta name="theme-color" content="#FF0000">
   <title>Cartoons</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23FF0000'/%3E%3Cpath fill='%23FFFFFF' d='M190 148c-8 0-14 6-14 14v188c0 8 6 14 14 14 3 0 6-1 9-3l148-94c7-4 9-13 5-20-1-2-3-4-5-5l-148-94c-3-2-6-3-9-3z'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%23FF0000'/%3E%3Cpath fill='%23FFFFFF' d='M190 148c-8 0-14 6-14 14v188c0 8 6 14 14 14 3 0 6-1 9-3l148-94c7-4 9-13 5-20-1-2-3-4-5-5l-148-94c-3-2-6-3-9-3z'/%3E%3C/svg%3E">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Cartoons%22%2C%22short_name%22%3A%22Cartoons%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23000000%22%2C%22theme_color%22%3A%22%23FF0000%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20512%20512'%253E%253Crect%20width%3D'512'%20height%3D'512'%20rx%3D'96'%20fill%3D'%2523FF0000'%2F%253E%253Cpath%20fill%3D'%2523FFFFFF'%20d%3D'M190%20148c-8%200-14%206-14%2014v188c0%208%206%2014%2014%2014%203%200%206-1%209-3l148-94c7-4%209-13%205-20-1-2-3-4-5-5l-148-94c-3-2-6-3-9-3z'%2F%253E%253C%2Fsvg%3E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%22%7D%5D%7D">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --bg: #0a0a0c; --surface: #16161c; --text: #f4f4f8; --muted: #888;
       --accent: #ff5c5c; --green: #5ecf7a;
-      --strip-h: 76px;
-      --add-h: 44px;
+      --strip-h: 54px;
       --safe-b: env(safe-area-inset-bottom, 0px);
     }
     html, body {
@@ -28,7 +31,6 @@
       max-width: 640px; margin: 0 auto;
     }
 
-    /* —— Main video (max screen) —— */
     .player-area {
       flex: 1; min-height: 0; background: #000; position: relative;
     }
@@ -50,64 +52,87 @@
       color: var(--muted); font-size: 0.8rem; padding: 12px; text-align: center;
     }
     .player-error { color: var(--accent); font-size: 0.76rem; line-height: 1.4; }
+
+    .btn-del-video {
+      display: none; position: absolute; top: 8px; right: 8px; z-index: 25;
+      width: 22px; height: 22px; line-height: 20px; text-align: center;
+      background: rgba(0,0,0,.55); color: #ff8a8a; border: 1px solid rgba(255,255,255,.2);
+      border-radius: 50%; font-size: 0.65rem; font-weight: 700; cursor: pointer; padding: 0;
+    }
+    .btn-del-video.visible { display: block; }
+
     .btn-stop {
       display: none; position: absolute; bottom: 10px; right: 10px; z-index: 20;
-      background: rgba(0,0,0,.7); color: #fff; border: 1px solid rgba(255,255,255,.25);
-      border-radius: 8px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; cursor: pointer;
+      background: rgba(0,0,0,.65); color: #fff; border: 1px solid rgba(255,255,255,.2);
+      border-radius: 8px; padding: 7px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer;
     }
     .btn-stop.visible { display: block; }
 
-    /* —— Bottom: add + tiny thumbs only —— */
     .bottom {
       flex-shrink: 0; background: var(--bg);
       padding-bottom: var(--safe-b);
       border-top: 1px solid #222;
     }
-    .add-row {
-      display: flex; gap: 6px; padding: 6px 8px;
-      height: var(--add-h); align-items: center;
-    }
-    .add-row input {
-      flex: 1; min-width: 0; background: var(--surface); border: none;
-      border-radius: 8px; color: var(--text); padding: 0 10px; font-size: 0.85rem; outline: none;
-    }
-    .add-row button {
-      background: var(--green); color: #0a1a0c; border: none;
-      border-radius: 8px; padding: 0 14px; height: 32px;
-      font-weight: 700; font-size: 0.82rem; cursor: pointer; flex-shrink: 0;
-    }
-    .msg { font-size: 0.7rem; padding: 0 8px 4px; min-height: 0; }
-    .msg.ok { color: var(--green); }
-    .msg.err { color: var(--accent); }
 
     .thumb-strip {
-      display: flex; gap: 8px; padding: 4px 8px 8px;
+      display: flex; gap: 8px; padding: 6px 8px;
       height: var(--strip-h); overflow-x: auto; overflow-y: hidden;
+      align-items: center;
       -webkit-overflow-scrolling: touch;
     }
     .thumb-strip::-webkit-scrollbar { height: 3px; }
     .thumb-strip::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
-    .thumb-card {
-      flex-shrink: 0; width: 72px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    .btn-add {
+      flex-shrink: 0; width: 40px; height: 40px;
+      background: var(--surface); border: 1px dashed #444; border-radius: 8px;
+      color: var(--green); font-size: 1.4rem; font-weight: 300; line-height: 1;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
     }
-    .btn-del {
-      width: 26px; height: 22px; line-height: 22px;
-      background: var(--surface); border: none; border-radius: 6px;
-      color: var(--accent); font-size: 0.85rem; font-weight: 700; cursor: pointer;
-      padding: 0;
-    }
+    .btn-add:active { background: #222; }
+
     .thumb-btn {
-      width: 72px; height: 40px; padding: 0; border: 2px solid transparent;
-      border-radius: 6px; overflow: hidden; cursor: pointer; background: #222;
+      flex-shrink: 0; width: 64px; height: 40px; padding: 0;
+      border: 2px solid transparent; border-radius: 6px;
+      overflow: hidden; cursor: pointer; background: #222;
     }
     .thumb-btn.active { border-color: #ffd93d; }
     .thumb-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
     .empty-strip {
-      flex: 1; display: flex; align-items: center; justify-content: center;
-      color: var(--muted); font-size: 0.72rem; padding: 0 12px; text-align: center;
+      color: var(--muted); font-size: 0.72rem; padding: 0 4px; white-space: nowrap;
     }
+
+    /* Add sheet — hidden until + tapped */
+    .add-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,.6);
+    }
+    .add-backdrop.open { display: block; }
+    .add-sheet {
+      display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 101;
+      background: var(--bg); border-top: 1px solid #333;
+      padding: 12px 12px calc(12px + var(--safe-b));
+      max-width: 640px; margin: 0 auto;
+    }
+    .add-sheet.open { display: block; }
+    .add-sheet .row { display: flex; gap: 8px; }
+    .add-sheet input {
+      flex: 1; min-width: 0; background: var(--surface); border: none;
+      border-radius: 10px; color: var(--text); padding: 12px; font-size: 0.9rem; outline: none;
+    }
+    .add-sheet .btn-save {
+      background: var(--green); color: #0a1a0c; border: none;
+      border-radius: 10px; padding: 0 18px; font-weight: 700; font-size: 0.88rem; cursor: pointer;
+    }
+    .add-sheet .btn-cancel {
+      margin-top: 10px; width: 100%; background: none; border: none;
+      color: var(--muted); font-size: 0.82rem; padding: 8px; cursor: pointer;
+    }
+    .msg { font-size: 0.72rem; margin-top: 8px; min-height: 1em; }
+    .msg.ok { color: var(--green); }
+    .msg.err { color: var(--accent); }
+
     #savedStore { display: none; }
   </style>
 </head>
@@ -119,20 +144,27 @@
           <span class="player-error" id="playerError" hidden></span>
         </div>
         <div id="playerSlot"></div>
+        <button type="button" class="btn-del-video" id="delVideoBtn" title="Remove this video">✕</button>
         <button type="button" class="btn-stop" id="stopBtn">Stop</button>
       </div>
     </div>
 
     <div class="bottom">
-      <div class="add-row">
-        <input type="url" id="urlInput" placeholder="Paste YouTube link…" autocomplete="off">
-        <button type="button" id="saveBtn">Save</button>
-      </div>
-      <div class="msg" id="addMsg"></div>
       <div class="thumb-strip" id="thumbStrip">
-        <div class="empty-strip" id="emptyStrip">Add videos above</div>
+        <button type="button" class="btn-add" id="openAddBtn" title="Add video">+</button>
+        <span class="empty-strip" id="emptyStrip">Tap + to add</span>
       </div>
     </div>
+  </div>
+
+  <div class="add-backdrop" id="addBackdrop"></div>
+  <div class="add-sheet" id="addSheet">
+    <div class="row">
+      <input type="url" id="urlInput" placeholder="Paste YouTube link…" autocomplete="off">
+      <button type="button" class="btn-save" id="saveBtn">Save</button>
+    </div>
+    <div class="msg" id="addMsg"></div>
+    <button type="button" class="btn-cancel" id="cancelAddBtn">Cancel</button>
   </div>
 
   <textarea id="savedStore"></textarea>
@@ -149,11 +181,16 @@
       var playerSlot = document.getElementById('playerSlot');
       var placeholder = document.getElementById('placeholder');
       var playerError = document.getElementById('playerError');
+      var delVideoBtn = document.getElementById('delVideoBtn');
       var stopBtn = document.getElementById('stopBtn');
       var thumbStrip = document.getElementById('thumbStrip');
       var emptyStrip = document.getElementById('emptyStrip');
+      var openAddBtn = document.getElementById('openAddBtn');
+      var addBackdrop = document.getElementById('addBackdrop');
+      var addSheet = document.getElementById('addSheet');
       var urlInput = document.getElementById('urlInput');
       var saveBtn = document.getElementById('saveBtn');
+      var cancelAddBtn = document.getElementById('cancelAddBtn');
       var addMsg = document.getElementById('addMsg');
       var savedStore = document.getElementById('savedStore');
 
@@ -236,6 +273,11 @@
         return 'https://www.youtube.com/embed/' + id + '?' + p.join('&');
       }
 
+      function setPlayingUi(on) {
+        stopBtn.classList.toggle('visible', on);
+        delVideoBtn.classList.toggle('visible', on);
+      }
+
       function destroyPlayer() {
         var iframe = playerSlot.querySelector('iframe');
         if (iframe) {
@@ -246,7 +288,7 @@
         }
         playerSlot.innerHTML = '';
         placeholder.style.display = 'flex';
-        stopBtn.classList.remove('visible');
+        setPlayingUi(false);
         playerWrap.classList.remove('is-short');
         currentId = null;
         playerError.hidden = true;
@@ -266,7 +308,7 @@
         destroyPlayer();
         currentId = item.id;
         playerWrap.classList.toggle('is-short', isShortUrl(item.url));
-        stopBtn.classList.add('visible');
+        setPlayingUi(true);
         playerError.hidden = true;
         renderThumbs();
 
@@ -280,33 +322,27 @@
         playerSlot.appendChild(iframe);
       }
 
-      function renderThumbs() {
-        thumbStrip.innerHTML = '';
-        if (!videos.length) {
-          thumbStrip.appendChild(emptyStrip);
-          emptyStrip.hidden = false;
-          destroyPlayer();
-          return;
+      function deleteCurrentVideo() {
+        if (!currentId) return;
+        var idx = -1;
+        for (var i = 0; i < videos.length; i++) {
+          if (videos[i].id === currentId) { idx = i; break; }
         }
-        emptyStrip.hidden = true;
+        destroyPlayer();
+        if (idx >= 0) {
+          videos.splice(idx, 1);
+          persistVideos();
+        }
+        renderThumbs();
+      }
 
-        videos.forEach(function (v, idx) {
-          var card = document.createElement('div');
-          card.className = 'thumb-card';
+      function renderThumbs() {
+        var addBtn = openAddBtn;
+        thumbStrip.innerHTML = '';
+        thumbStrip.appendChild(addBtn);
+        emptyStrip.hidden = videos.length > 0;
 
-          var del = document.createElement('button');
-          del.type = 'button';
-          del.className = 'btn-del';
-          del.title = 'Delete';
-          del.textContent = '✕';
-          del.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (v.id === currentId) destroyPlayer();
-            videos.splice(idx, 1);
-            persistVideos();
-            renderThumbs();
-          });
-
+        videos.forEach(function (v) {
           var btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'thumb-btn' + (v.id === currentId ? ' active' : '');
@@ -316,11 +352,23 @@
           img.loading = 'lazy';
           btn.appendChild(img);
           btn.addEventListener('click', function () { playVideo(v); });
-
-          card.appendChild(del);
-          card.appendChild(btn);
-          thumbStrip.appendChild(card);
+          thumbStrip.appendChild(btn);
         });
+
+        if (!videos.length) thumbStrip.appendChild(emptyStrip);
+      }
+
+      function openAddSheet() {
+        addBackdrop.classList.add('open');
+        addSheet.classList.add('open');
+        addMsg.textContent = '';
+        urlInput.value = '';
+        setTimeout(function () { urlInput.focus(); }, 100);
+      }
+
+      function closeAddSheet() {
+        addBackdrop.classList.remove('open');
+        addSheet.classList.remove('open');
       }
 
       function saveVideo() {
@@ -340,13 +388,14 @@
         }
         videos.push({ id: id, url: url });
         persistVideos();
-        urlInput.value = '';
-        addMsg.className = 'msg ok';
-        addMsg.textContent = 'Saved!';
+        closeAddSheet();
         renderThumbs();
         playVideo(videos[videos.length - 1]);
       }
 
+      openAddBtn.addEventListener('click', openAddSheet);
+      cancelAddBtn.addEventListener('click', closeAddSheet);
+      addBackdrop.addEventListener('click', closeAddSheet);
       saveBtn.addEventListener('click', saveVideo);
       urlInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') saveVideo();
@@ -354,6 +403,10 @@
       stopBtn.addEventListener('click', function () {
         destroyPlayer();
         renderThumbs();
+      });
+      delVideoBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        deleteCurrentVideo();
       });
 
       window.addEventListener('pagehide', destroyPlayer);
