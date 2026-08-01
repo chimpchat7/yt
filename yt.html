@@ -43,7 +43,6 @@
     header h1 { font-size: 1.3rem; font-weight: 700; }
     header p { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
 
-    /* Player stays fixed at top while list scrolls underneath */
     .player-sticky {
       position: -webkit-sticky;
       position: sticky;
@@ -72,13 +71,17 @@
       max-width: 320px;
     }
 
-    #player {
+    #playerSlot {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
+    }
+
+    #playerSlot iframe {
+      width: 100%;
+      height: 100%;
       border: 0;
-      display: none;
     }
 
     .player-placeholder {
@@ -94,6 +97,7 @@
       padding: 16px;
       text-align: center;
       background: #000;
+      z-index: 1;
     }
 
     .player-placeholder .icon { font-size: 2.2rem; opacity: .75; }
@@ -105,15 +109,37 @@
       max-width: 280px;
     }
 
-    .now-playing {
+    .now-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin-top: 8px;
+      min-height: 1.4em;
+    }
+
+    .now-playing {
+      flex: 1;
       font-size: 0.9rem;
       font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      min-height: 1.2em;
     }
+
+    .btn-stop {
+      display: none;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-stop.visible { display: block; }
 
     .scroll-body { padding-top: 4px; }
 
@@ -131,10 +157,7 @@
       margin-bottom: 6px;
     }
 
-    .add-row {
-      display: flex;
-      gap: 8px;
-    }
+    .add-row { display: flex; gap: 8px; }
 
     .add-row input {
       flex: 1;
@@ -235,15 +258,13 @@
       font-size: 0.9rem;
       line-height: 1.5;
     }
-
-    #savedStore { display: none; }
   </style>
 </head>
 <body>
   <div class="app">
     <header>
       <h1>🎬 My Cartoons</h1>
-      <p>Paste link → Save → tap to play</p>
+      <p>Saved on this phone until you delete</p>
     </header>
 
     <div class="player-sticky">
@@ -253,15 +274,12 @@
           <span>Tap a video below</span>
           <span class="player-error" id="playerError" hidden></span>
         </div>
-        <iframe
-          id="player"
-          title="Video player"
-          referrerpolicy="strict-origin-when-cross-origin"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowfullscreen
-        ></iframe>
+        <div id="playerSlot"></div>
       </div>
-      <div class="now-playing" id="nowPlaying">&nbsp;</div>
+      <div class="now-row">
+        <div class="now-playing" id="nowPlaying">&nbsp;</div>
+        <button type="button" class="btn-stop" id="stopBtn">Stop</button>
+      </div>
     </div>
 
     <div class="scroll-body">
@@ -282,23 +300,22 @@
     </div>
   </div>
 
-  <textarea id="savedStore"></textarea>
-
   <script>
     (function () {
+      var STORAGE_KEY = 'localyt_videos';
       var videos = [];
       var currentId = null;
       var isFilePage = location.protocol === 'file:';
 
       var playerWrap = document.getElementById('playerWrap');
-      var player = document.getElementById('player');
+      var playerSlot = document.getElementById('playerSlot');
       var placeholder = document.getElementById('placeholder');
       var playerError = document.getElementById('playerError');
       var nowPlaying = document.getElementById('nowPlaying');
+      var stopBtn = document.getElementById('stopBtn');
       var videoList = document.getElementById('videoList');
       var emptyState = document.getElementById('emptyState');
       var countEl = document.getElementById('count');
-      var savedStore = document.getElementById('savedStore');
       var urlInput = document.getElementById('urlInput');
       var saveBtn = document.getElementById('saveBtn');
       var addMsg = document.getElementById('addMsg');
@@ -332,31 +349,21 @@
         return (url || '').indexOf('/shorts/') >= 0;
       }
 
-      function parseLine(line) {
-        line = (line || '').trim();
-        if (!line) return null;
-        var url = line.split('|')[0].trim();
-        var id = extractVideoId(url);
-        if (!id) return null;
-        return { id: id, url: url };
+      function loadVideos() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          videos = raw ? JSON.parse(raw) : [];
+          if (!Array.isArray(videos)) videos = [];
+          videos = videos.filter(function (v) {
+            return v && v.id && v.url && extractVideoId(v.url) === v.id;
+          });
+        } catch (e) {
+          videos = [];
+        }
       }
 
-      function readFromPage() {
-        var lines = savedStore.value.split('\n');
-        var list = [];
-        var seen = {};
-        lines.forEach(function (line) {
-          var v = parseLine(line);
-          if (v && !seen[v.id]) {
-            seen[v.id] = true;
-            list.push(v);
-          }
-        });
-        videos = list;
-      }
-
-      function writeToPage() {
-        savedStore.value = videos.map(function (v) { return v.url; }).join('\n');
+      function saveVideos() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
       }
 
       function thumbUrl(id) {
@@ -369,6 +376,7 @@
           'playsinline=1',
           'rel=0',
           'modestbranding=1',
+          'enablejsapi=1',
           'fs=1',
           'iv_load_policy=3'
         ];
@@ -377,12 +385,44 @@
         return 'https://www.youtube.com/embed/' + id + '?' + parts.join('&');
       }
 
+      function getIframe() {
+        return playerSlot.querySelector('iframe');
+      }
+
+      function pauseIframe(iframe) {
+        if (!iframe || !iframe.contentWindow) return;
+        try {
+          iframe.contentWindow.postMessage(
+            '{"event":"command","func":"pauseVideo","args":""}',
+            '*'
+          );
+          iframe.contentWindow.postMessage(
+            '{"event":"command","func":"stopVideo","args":""}',
+            '*'
+          );
+        } catch (_) {}
+      }
+
+      function destroyPlayer() {
+        var iframe = getIframe();
+        if (iframe) {
+          pauseIframe(iframe);
+          iframe.src = 'about:blank';
+          iframe.removeAttribute('src');
+        }
+        playerSlot.innerHTML = '';
+        placeholder.style.display = 'flex';
+        stopBtn.classList.remove('visible');
+        playerWrap.classList.remove('is-short');
+        nowPlaying.innerHTML = '&nbsp;';
+        currentId = null;
+        clearError();
+      }
+
       function showError(msg) {
+        destroyPlayer();
         playerError.textContent = msg;
         playerError.hidden = false;
-        placeholder.style.display = 'flex';
-        player.style.display = 'none';
-        player.removeAttribute('src');
       }
 
       function clearError() {
@@ -396,30 +436,31 @@
           return;
         }
 
+        if (currentId === id && getIframe()) {
+          destroyPlayer();
+          renderList();
+          return;
+        }
+
+        destroyPlayer();
+
         currentId = id;
         playerWrap.classList.toggle('is-short', isShortUrl(url));
         nowPlaying.textContent = label || (isShortUrl(url) ? 'Short' : 'Video');
+        stopBtn.classList.add('visible');
         clearError();
         renderList();
 
+        var iframe = document.createElement('iframe');
+        iframe.title = 'Video player';
+        iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+        iframe.allow =
+          'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+        iframe.allowFullscreen = true;
+        iframe.src = embedUrl(id);
+
         placeholder.style.display = 'none';
-        player.style.display = 'block';
-        player.referrerPolicy = 'strict-origin-when-cross-origin';
-
-        var nextSrc = embedUrl(id);
-        if (player.src !== nextSrc) {
-          player.src = nextSrc;
-        }
-      }
-
-      function stopPlayer() {
-        player.removeAttribute('src');
-        player.style.display = 'none';
-        placeholder.style.display = 'flex';
-        playerWrap.classList.remove('is-short');
-        nowPlaying.innerHTML = '&nbsp;';
-        currentId = null;
-        clearError();
+        playerSlot.appendChild(iframe);
       }
 
       function renderList() {
@@ -428,7 +469,7 @@
 
         if (!videos.length) {
           emptyState.hidden = false;
-          stopPlayer();
+          destroyPlayer();
           return;
         }
         emptyState.hidden = true;
@@ -490,10 +531,10 @@
           return;
         }
         videos.push({ id: id, url: url });
-        writeToPage();
+        saveVideos();
         urlInput.value = '';
         addMsg.className = 'msg ok';
-        addMsg.textContent = 'Saved! Playing…';
+        addMsg.textContent = 'Saved on this phone!';
         renderList();
         playVideo(id, url);
       }
@@ -501,17 +542,28 @@
       function removeVideo(idx) {
         var removed = videos[idx];
         videos.splice(idx, 1);
-        writeToPage();
-        if (removed && removed.id === currentId) stopPlayer();
+        saveVideos();
+        if (removed && removed.id === currentId) destroyPlayer();
         renderList();
       }
+
+      stopBtn.addEventListener('click', function () {
+        destroyPlayer();
+        renderList();
+      });
 
       saveBtn.addEventListener('click', saveVideo);
       urlInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') saveVideo();
       });
 
-      readFromPage();
+      window.addEventListener('pagehide', destroyPlayer);
+      window.addEventListener('beforeunload', destroyPlayer);
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) destroyPlayer();
+      });
+
+      loadVideos();
       renderList();
     })();
   </script>
