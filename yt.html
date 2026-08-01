@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0f0f12">
+  <title>My Cartoons</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f12;
+      --surface: #1a1a22;
+      --surface2: #252530;
+      --text: #f4f4f8;
+      --muted: #9a9ab0;
+      --accent: #ff6b6b;
+      --accent2: #ffd93d;
+      --green: #6bcb77;
+      --radius: 14px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
+    }
+
+    .app {
+      max-width: 640px;
+      margin: 0 auto;
+      min-height: 100%;
+      padding: 12px 12px calc(16px + var(--safe-bottom));
+    }
+
+    header { text-align: center; padding: 8px 0 14px; }
+    header h1 { font-size: 1.35rem; font-weight: 700; }
+    header p { color: var(--muted); font-size: 0.82rem; margin-top: 4px; }
+
+    .file-warn {
+      background: #3a2a10;
+      border: 1px solid var(--accent2);
+      color: #ffe9a8;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      margin-bottom: 12px;
+    }
+
+    .player-wrap {
+      background: #000;
+      border-radius: var(--radius);
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      position: relative;
+      box-shadow: 0 8px 32px rgba(0,0,0,.45);
+    }
+
+    .player-wrap.is-short { aspect-ratio: 9 / 16; max-height: 70vh; }
+
+    #ytHost {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ytHost iframe {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .player-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      padding: 20px;
+      text-align: center;
+      z-index: 2;
+      background: #000;
+    }
+
+    .player-placeholder .icon { font-size: 2.4rem; opacity: .7; }
+
+    .player-error {
+      color: var(--accent);
+      font-size: 0.8rem;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .now-playing {
+      margin: 12px 0 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .add-box {
+      margin-top: 16px;
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .add-box label {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .add-box input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--surface2);
+      border-radius: 10px;
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      outline: none;
+      margin-bottom: 10px;
+    }
+
+    .add-box input:focus { border-color: var(--green); }
+
+    .btn-save {
+      width: 100%;
+      background: var(--green);
+      color: #0a1a0c;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    .btn-save:active { opacity: .85; }
+
+    .msg { font-size: 0.8rem; margin-top: 8px; min-height: 1.2em; }
+    .msg.ok { color: var(--green); }
+    .msg.err { color: var(--accent); }
+
+    .section-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin: 18px 0 10px;
+    }
+
+    .video-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .video-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .video-item:active { transform: scale(.985); }
+    .video-item.active { border-color: var(--accent2); background: var(--surface2); }
+
+    .video-item .thumb {
+      width: 72px;
+      height: 48px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--surface2);
+      flex-shrink: 0;
+    }
+
+    .video-item .info { flex: 1; min-width: 0; }
+
+    .video-item .title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .video-item .meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .btn-del {
+      background: var(--surface2);
+      border: none;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 28px 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    #savedStore { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🎬 My Cartoons</h1>
+      <p>Paste link → Save → tap video to play</p>
+    </header>
+
+    <div class="file-warn" id="fileWarn" hidden>
+      Open via <strong id="hostedHint"></strong> — not as a saved file (YouTube blocks file://).
+    </div>
+
+    <div class="player-wrap" id="playerWrap">
+      <div class="player-placeholder" id="placeholder">
+        <span class="icon">▶️</span>
+        <span>Tap a saved video below</span>
+        <span class="player-error" id="playerError" hidden></span>
+      </div>
+      <div id="ytHost"></div>
+    </div>
+
+    <div class="now-playing" id="nowPlaying">&nbsp;</div>
+
+    <div class="add-box">
+      <label for="urlInput">YouTube or Shorts link</label>
+      <input type="url" id="urlInput" placeholder="Paste link here…" autocomplete="off">
+      <label for="titleInput">Name (optional)</label>
+      <input type="text" id="titleInput" placeholder="Cartoon name" maxlength="80">
+      <button type="button" class="btn-save" id="saveBtn">Save to this page</button>
+      <div class="msg" id="addMsg"></div>
+    </div>
+
+    <div class="section-title">Saved on this page (<span id="count">0</span>)</div>
+    <div class="video-list" id="videoList"></div>
+    <div class="empty" id="emptyState" hidden>
+      No videos yet.<br>Paste a link above and tap Save.
+    </div>
+  </div>
+
+  <textarea id="savedStore"></textarea>
+
+  <script>
+    (function () {
+      var videos = [];
+      var currentId = null;
+      var ytPlayer = null;
+      var ytReady = false;
+      var pendingId = null;
+      var isFilePage = location.protocol === 'file:';
+
+      var playerWrap = document.getElementById('playerWrap');
+      var placeholder = document.getElementById('placeholder');
+      var playerError = document.getElementById('playerError');
+      var nowPlaying = document.getElementById('nowPlaying');
+      var videoList = document.getElementById('videoList');
+      var emptyState = document.getElementById('emptyState');
+      var countEl = document.getElementById('count');
+      var savedStore = document.getElementById('savedStore');
+      var urlInput = document.getElementById('urlInput');
+      var titleInput = document.getElementById('titleInput');
+      var saveBtn = document.getElementById('saveBtn');
+      var addMsg = document.getElementById('addMsg');
+      var fileWarn = document.getElementById('fileWarn');
+      var hostedHint = document.getElementById('hostedHint');
+
+      if (isFilePage) {
+        fileWarn.hidden = false;
+        hostedHint.textContent = 'http://localhost:4567/localyt.html';
+      }
+
+      function pageOrigin() {
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+          return location.origin;
+        }
+        return null;
+      }
+
+      function extractVideoId(url) {
+        if (!url || typeof url !== 'string') return null;
+        var u = url.trim();
+        var patterns = [
+          /(?:youtube\.com\/watch\?(?:.*&)?v=|youtube\.com\/watch\?v=)([\w-]{11})/i,
+          /youtu\.be\/([\w-]{11})/i,
+          /youtube\.com\/shorts\/([\w-]{11})/i,
+          /youtube\.com\/embed\/([\w-]{11})/i,
+          /youtube\.com\/live\/([\w-]{11})/i,
+          /m\.youtube\.com\/watch\?(?:.*&)?v=([\w-]{11})/i
+        ];
+        for (var i = 0; i < patterns.length; i++) {
+          var m = u.match(patterns[i]);
+          if (m) return m[1];
+        }
+        return null;
+      }
+
+      function isShortUrl(url) {
+        return (url || '').indexOf('/shorts/') >= 0;
+      }
+
+      function lineFromVideo(v) {
+        return v.title ? (v.url + ' | ' + v.title) : v.url;
+      }
+
+      function parseLine(line) {
+        line = (line || '').trim();
+        if (!line) return null;
+        var parts = line.split('|');
+        var url = parts[0].trim();
+        var title = parts.length > 1 ? parts.slice(1).join('|').trim() : '';
+        var id = extractVideoId(url);
+        if (!id) return null;
+        return { id: id, url: url, title: title };
+      }
+
+      function readFromPage() {
+        var lines = savedStore.value.split('\n');
+        var list = [];
+        var seen = {};
+        lines.forEach(function (line) {
+          var v = parseLine(line);
+          if (v && !seen[v.id]) {
+            seen[v.id] = true;
+            list.push(v);
+          }
+        });
+        videos = list;
+      }
+
+      function writeToPage() {
+        savedStore.value = videos.map(lineFromVideo).join('\n');
+      }
+
+      function thumbUrl(id) {
+        return 'https://img.youtube.com/vi/' + id + '/mqdefault.jpg';
+      }
+
+      function showPlayerError(msg) {
+        playerError.textContent = msg;
+        playerError.hidden = false;
+        placeholder.hidden = false;
+      }
+
+      function clearPlayerError() {
+        playerError.hidden = true;
+        playerError.textContent = '';
+      }
+
+      function playerVars() {
+        var vars = {
+          rel: 0,
+          modestbranding: 1,
+          playsinline: 1,
+          enablejsapi: 1,
+          fs: 1,
+          iv_load_policy: 3
+        };
+        var origin = pageOrigin();
+        if (origin) vars.origin = origin;
+        return vars;
+      }
+
+      function ensureYtApi() {
+        if (window.YT && window.YT.Player) return;
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.referrerPolicy = 'strict-origin-when-cross-origin';
+        document.head.appendChild(tag);
+      }
+
+      function createPlayer(videoId) {
+        ytPlayer = new YT.Player('ytHost', {
+          height: '100%',
+          width: '100%',
+          videoId: videoId,
+          playerVars: playerVars(),
+          events: {
+            onReady: function () {
+              ytReady = true;
+              placeholder.hidden = true;
+              clearPlayerError();
+              try { ytPlayer.playVideo(); } catch (_) {}
+            },
+            onError: function (e) {
+              var code = e && e.data;
+              var msg = 'Could not play this video.';
+              if (code === 101 || code === 150) {
+                msg = 'Owner blocked embedding. Try another video.';
+              } else if (code === 153) {
+                msg = 'Use http://localhost:4567/localyt.html (not a saved file).';
+              }
+              showPlayerError(msg);
+            }
+          }
+        });
+      }
+
+      window.onYouTubeIframeAPIReady = function () {
+        if (pendingId) {
+          createPlayer(pendingId);
+          pendingId = null;
+        }
+      };
+
+      function playVideo(id, title, url) {
+        if (isFilePage) {
+          showPlayerError('Open via http://localhost:4567/localyt.html first.');
+          return;
+        }
+
+        currentId = id;
+        playerWrap.classList.toggle('is-short', isShortUrl(url));
+        nowPlaying.textContent = title || 'Now playing';
+        clearPlayerError();
+        renderList();
+
+        if (ytPlayer && ytReady && ytPlayer.loadVideoById) {
+          placeholder.hidden = true;
+          ytPlayer.loadVideoById(id);
+          try { ytPlayer.playVideo(); } catch (_) {}
+          return;
+        }
+
+        if (ytPlayer) {
+          try { ytPlayer.destroy(); } catch (_) {}
+          ytPlayer = null;
+          ytReady = false;
+          document.getElementById('ytHost').innerHTML = '';
+        }
+
+        pendingId = id;
+        ensureYtApi();
+
+        if (window.YT && window.YT.Player) {
+          createPlayer(id);
+          pendingId = null;
+        }
+      }
+
+      function stopPlayer() {
+        if (ytPlayer) {
+          try { ytPlayer.stopVideo(); } catch (_) {}
+        }
+        placeholder.hidden = false;
+        playerWrap.classList.remove('is-short');
+        nowPlaying.innerHTML = '&nbsp;';
+        currentId = null;
+        clearPlayerError();
+      }
+
+      function renderList() {
+        countEl.textContent = String(videos.length);
+        videoList.innerHTML = '';
+
+        if (!videos.length) {
+          emptyState.hidden = false;
+          stopPlayer();
+          return;
+        }
+        emptyState.hidden = true;
+
+        videos.forEach(function (v, idx) {
+          var item = document.createElement('div');
+          item.className = 'video-item' + (v.id === currentId ? ' active' : '');
+
+          var img = document.createElement('img');
+          img.className = 'thumb';
+          img.src = thumbUrl(v.id);
+          img.alt = '';
+          img.loading = 'lazy';
+
+          var info = document.createElement('div');
+          info.className = 'info';
+          var t = document.createElement('div');
+          t.className = 'title';
+          t.textContent = v.title || ('Video ' + (idx + 1));
+          var meta = document.createElement('div');
+          meta.className = 'meta';
+          meta.textContent = isShortUrl(v.url) ? 'Short' : 'Video';
+          info.appendChild(t);
+          info.appendChild(meta);
+
+          var del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'btn-del';
+          del.textContent = 'Delete';
+          del.addEventListener('click', function (e) {
+            e.stopPropagation();
+            removeVideo(idx);
+          });
+
+          item.appendChild(img);
+          item.appendChild(info);
+          item.appendChild(del);
+          item.addEventListener('click', function () {
+            playVideo(v.id, v.title, v.url);
+          });
+
+          videoList.appendChild(item);
+        });
+      }
+
+      function saveVideo() {
+        addMsg.className = 'msg';
+        addMsg.textContent = '';
+        var url = urlInput.value.trim();
+        var title = titleInput.value.trim();
+        var id = extractVideoId(url);
+        if (!id) {
+          addMsg.className = 'msg err';
+          addMsg.textContent = 'Bad link. Paste a full YouTube or Shorts URL.';
+          return;
+        }
+        if (videos.some(function (v) { return v.id === id; })) {
+          addMsg.className = 'msg err';
+          addMsg.textContent = 'Already saved on this page.';
+          return;
+        }
+        videos.push({ id: id, url: url, title: title });
+        writeToPage();
+        urlInput.value = '';
+        titleInput.value = '';
+        addMsg.className = 'msg ok';
+        addMsg.textContent = 'Saved! Tap the video to play.';
+        renderList();
+        playVideo(id, title, url);
+      }
+
+      function removeVideo(idx) {
+        var removed = videos[idx];
+        videos.splice(idx, 1);
+        writeToPage();
+        if (removed && removed.id === currentId) stopPlayer();
+        renderList();
+      }
+
+      saveBtn.addEventListener('click', saveVideo);
+      urlInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') saveVideo();
+      });
+
+      ensureYtApi();
+      readFromPage();
+      renderList();
+    })();
+  </script>
+</body>
+</html>
