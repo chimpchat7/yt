@@ -300,12 +300,16 @@
     </div>
   </div>
 
+  <!-- backup list (also read on load if browser storage was cleared) -->
+  <textarea id="savedStore" hidden aria-hidden="true"></textarea>
+
   <script>
     (function () {
       var STORAGE_KEY = 'localyt_videos';
       var videos = [];
       var currentId = null;
       var isFilePage = location.protocol === 'file:';
+      var storageOk = true;
 
       var playerWrap = document.getElementById('playerWrap');
       var playerSlot = document.getElementById('playerSlot');
@@ -319,6 +323,57 @@
       var urlInput = document.getElementById('urlInput');
       var saveBtn = document.getElementById('saveBtn');
       var addMsg = document.getElementById('addMsg');
+      var savedStore = document.getElementById('savedStore');
+
+      function cookiePath() {
+        var p = location.pathname || '/';
+        var i = p.lastIndexOf('/');
+        return i > 0 ? p.slice(0, i + 1) : '/';
+      }
+
+      function readCookie() {
+        var prefix = STORAGE_KEY + '=';
+        var parts = document.cookie.split(';');
+        for (var i = 0; i < parts.length; i++) {
+          var c = parts[i].replace(/^\s+/, '');
+          if (c.indexOf(prefix) === 0) {
+            try {
+              return JSON.parse(decodeURIComponent(c.slice(prefix.length)));
+            } catch (e) {
+              return null;
+            }
+          }
+        }
+        return null;
+      }
+
+      function writeCookie(json) {
+        if (json.length > 3500) return;
+        document.cookie =
+          STORAGE_KEY + '=' + encodeURIComponent(json) +
+          ';path=' + cookiePath() +
+          ';max-age=31536000;SameSite=Lax';
+      }
+
+      function normalizeList(list) {
+        if (!Array.isArray(list)) return [];
+        var out = [];
+        var seen = {};
+        list.forEach(function (item) {
+          var url = typeof item === 'string' ? item : (item && item.url);
+          if (!url) return;
+          url = String(url).trim();
+          var id = extractVideoId(url);
+          if (!id || seen[id]) return;
+          seen[id] = true;
+          out.push({ id: id, url: url });
+        });
+        return out;
+      }
+
+      function syncBackupField() {
+        savedStore.value = videos.map(function (v) { return v.url; }).join('\n');
+      }
 
       function pageOrigin() {
         if (location.protocol === 'http:' || location.protocol === 'https:') {
@@ -350,20 +405,68 @@
       }
 
       function loadVideos() {
+        var fromLs = null;
+        var fromSs = null;
+        var fromCk = null;
+        var fromField = null;
+
         try {
           var raw = localStorage.getItem(STORAGE_KEY);
-          videos = raw ? JSON.parse(raw) : [];
-          if (!Array.isArray(videos)) videos = [];
-          videos = videos.filter(function (v) {
-            return v && v.id && v.url && extractVideoId(v.url) === v.id;
-          });
-        } catch (e) {
-          videos = [];
+          if (raw) fromLs = JSON.parse(raw);
+        } catch (e) {}
+
+        try {
+          var raw2 = sessionStorage.getItem(STORAGE_KEY);
+          if (raw2) fromSs = JSON.parse(raw2);
+        } catch (e2) {}
+
+        fromCk = readCookie();
+
+        if (savedStore && savedStore.value.trim()) {
+          fromField = savedStore.value.split('\n');
         }
+
+        var merged = normalizeList(
+          [].concat(
+            fromLs || [],
+            fromSs || [],
+            fromCk || [],
+            fromField || []
+          )
+        );
+
+        videos = merged;
+        if (videos.length) saveVideos(false);
+        syncBackupField();
       }
 
-      function saveVideos() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
+      function saveVideos(showError) {
+        var json = JSON.stringify(videos);
+        var ok = false;
+
+        try {
+          localStorage.setItem(STORAGE_KEY, json);
+          if (localStorage.getItem(STORAGE_KEY) === json) ok = true;
+        } catch (e) {}
+
+        try {
+          sessionStorage.setItem(STORAGE_KEY, json);
+          ok = true;
+        } catch (e2) {}
+
+        try {
+          writeCookie(json);
+          ok = true;
+        } catch (e3) {}
+
+        syncBackupField();
+        storageOk = ok;
+
+        if (!ok && showError !== false) {
+          addMsg.className = 'msg err';
+          addMsg.textContent = 'Could not save — turn off private mode or allow site data.';
+        }
+        return ok;
       }
 
       function thumbUrl(id) {
@@ -531,10 +634,13 @@
           return;
         }
         videos.push({ id: id, url: url });
-        saveVideos();
+        if (!saveVideos(true)) {
+          renderList();
+          return;
+        }
         urlInput.value = '';
         addMsg.className = 'msg ok';
-        addMsg.textContent = 'Saved on this phone!';
+        addMsg.textContent = 'Saved! (' + videos.length + ' video' + (videos.length === 1 ? '' : 's') + ')';
         renderList();
         playVideo(id, url);
       }
@@ -542,7 +648,7 @@
       function removeVideo(idx) {
         var removed = videos[idx];
         videos.splice(idx, 1);
-        saveVideos();
+        saveVideos(true);
         if (removed && removed.id === currentId) destroyPlayer();
         renderList();
       }
