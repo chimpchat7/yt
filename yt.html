@@ -22,26 +22,22 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       -webkit-tap-highlight-color: transparent;
     }
-    .app { max-width: 640px; margin: 0 auto; padding: 12px 12px calc(20px + var(--safe-bottom)); }
-    header { text-align: center; padding: 6px 0 8px; position: relative; }
-    header h1 { font-size: 1.3rem; font-weight: 700; }
-    header p { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+    .app { max-width: 640px; margin: 0 auto; padding: 0 8px calc(16px + var(--safe-bottom)); }
     .parent-btn {
-      position: absolute; right: 0; top: 8px;
-      background: var(--surface2); border: none; color: var(--muted);
-      font-size: 1.1rem; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+      position: absolute; right: 8px; top: 8px; z-index: 60;
+      background: rgba(0,0,0,.55); border: none; color: #fff;
+      font-size: 1rem; padding: 6px 9px; border-radius: 8px; cursor: pointer;
     }
     .player-sticky {
-      position: -webkit-sticky; position: sticky; top: var(--safe-top); z-index: 50;
-      background: var(--bg); padding: 8px 0 10px; margin: 0 -12px;
-      padding-left: 12px; padding-right: 12px;
-      box-shadow: 0 10px 24px rgba(0,0,0,.45);
+      position: -webkit-sticky; position: sticky; top: 0; z-index: 50;
+      background: var(--bg); padding: 0; margin: 0 -8px 6px;
+      padding-left: 8px; padding-right: 8px;
     }
     .player-wrap {
-      background: #000; border-radius: var(--radius); overflow: hidden;
-      aspect-ratio: 16/9; position: relative;
+      background: #000; border-radius: 10px; overflow: hidden;
+      width: 100%; aspect-ratio: 16/9; position: relative;
     }
-    .player-wrap.is-short { aspect-ratio: 9/16; max-height: min(50vh,480px); margin: 0 auto; max-width: 300px; }
+    .player-wrap.is-short { aspect-ratio: 9/16; max-height: 72vh; margin: 0 auto; max-width: 340px; }
     #playerSlot { position: absolute; inset: 0; }
     #playerSlot iframe { width: 100%; height: 100%; border: 0; }
     .player-placeholder {
@@ -50,15 +46,16 @@
       color: var(--muted); font-size: 0.85rem; padding: 16px; text-align: center;
       background: #000; z-index: 1;
     }
-    .player-placeholder .icon { font-size: 2rem; }
+    .player-placeholder .icon { font-size: 1.6rem; opacity: .5; }
     .player-error { color: var(--accent); font-size: 0.76rem; line-height: 1.4; max-width: 280px; }
-    .now-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .now-row { display: none; align-items: center; gap: 8px; margin-top: 6px; }
+    .now-row.visible { display: flex; }
     .now-playing { flex: 1; font-size: 0.88rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .btn-stop {
-      display: none; background: var(--accent); color: #fff; border: none;
+      background: var(--accent); color: #fff; border: none;
       border-radius: 8px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; cursor: pointer;
+      flex-shrink: 0;
     }
-    .btn-stop.visible { display: block; }
     .edu-badge {
       display: inline-block; background: #1a3a2a; color: var(--green);
       font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;
@@ -126,22 +123,15 @@
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>🧒 Learn — Age 4</h1>
-      <p>Simple preschool videos only (nursery, ABC, animals…)</p>
-      <button type="button" class="parent-btn" id="parentBtn" title="Parent">⚙️</button>
-    </header>
-
     <div class="player-sticky">
       <div class="player-wrap" id="playerWrap">
+        <button type="button" class="parent-btn" id="parentBtn" title="Parent">⚙️</button>
         <div class="player-placeholder" id="placeholder">
-          <span class="icon">📺</span>
-          <span>Tap a picture below 👇</span>
           <span class="player-error" id="playerError" hidden></span>
         </div>
         <div id="playerSlot"></div>
       </div>
-      <div class="now-row">
+      <div class="now-row" id="nowRow">
         <div class="now-playing" id="nowPlaying">&nbsp;</div>
         <button type="button" class="btn-stop" id="stopBtn">Stop</button>
       </div>
@@ -253,6 +243,7 @@
       var placeholder = document.getElementById('placeholder');
       var playerError = document.getElementById('playerError');
       var nowPlaying = document.getElementById('nowPlaying');
+      var nowRow = document.getElementById('nowRow');
       var stopBtn = document.getElementById('stopBtn');
       var videoList = document.getElementById('videoList');
       var searchList = document.getElementById('searchList');
@@ -410,7 +401,7 @@
         }
         playerSlot.innerHTML = '';
         placeholder.style.display = 'flex';
-        stopBtn.classList.remove('visible');
+        if (nowRow) nowRow.classList.remove('visible');
         playerWrap.classList.remove('is-short');
         nowPlaying.innerHTML = '&nbsp;';
         currentId = null;
@@ -433,7 +424,7 @@
         currentId = item.id;
         playerWrap.classList.toggle('is-short', isShortUrl(item.url));
         nowPlaying.textContent = label || item.title || 'Playing';
-        stopBtn.classList.add('visible');
+        if (nowRow) nowRow.classList.add('visible');
         renderSaved();
         renderSearch();
 
@@ -642,7 +633,8 @@
         chipRow.appendChild(b);
       });
 
-      parentBtn.addEventListener('click', function () {
+      parentBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
         parentPanel.scrollIntoView({ behavior: 'smooth' });
       });
 
